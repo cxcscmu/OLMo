@@ -1,0 +1,16 @@
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0022/part-04-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0022/part-24-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0003/part-24-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0004/part-26-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0007/part-08-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0027/part-25-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0008/part-53-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0003/part-15-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0023/part-07-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0027/part-45-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0006/part-31-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0001/part-57-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0022/part-09-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0023/part-04-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0024/part-63-00000.npy
+http://olmo-data.org/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0008/part-27-00000.npy
