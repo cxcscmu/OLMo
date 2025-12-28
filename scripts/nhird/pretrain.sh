@@ -24,4 +24,16 @@ if [[ ! -d "${LOCAL_ROOT}/pretrained_ckpt" ]]; then
   gcloud storage cp -r "${GCS_ROOT}/pretrained_ckpt" ${LOCAL_ROOT}
 fi
 
-torchrun --nproc_per_node=8 scripts/train.py "${CONFIG_PATH}"
+# Count visible GPUs
+NUM_GPUS=$(nvidia-smi -L | wc -l)
+
+echo "Detected ${NUM_GPUS} GPUs"
+
+if [ "$NUM_GPUS" -eq 0 ]; then
+  echo "ERROR: No GPUs detected"
+  exit 1
+fi
+
+torchrun \
+  --nproc_per_node="$NUM_GPUS" \
+  scripts/train.py "${CONFIG_PATH}"
