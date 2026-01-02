@@ -1,0 +1,139 @@
+# Configuration for data influence computation
+# Based on OLMo2-1B-stage2-1ep.yaml with minimal changes:
+# 1. Change data.paths to validation data (train on valid)
+# 2. Set max_duration to a small number of steps (e.g., 5)
+# 3. Keep reset_optimizer_state=false and reset_trainer_state=false
+# 4. Change save_folder for influence outputs
+
+run_name: probe_influence_nhird
+seed: 42
+dry_run: false
+
+model:
+  d_model: 2048
+  n_heads: 16
+  n_layers: 16
+  mlp_ratio: 8
+  weight_tying: false
+  alibi: false
+  rope: true
+  rope_theta: 500000
+  flash_attention: true
+  attention_dropout: 0.0
+  include_bias: false
+  block_type: sequential
+  layer_norm_type: rms
+  layer_norm_with_affine: true
+  layer_norm_eps: 1e-6
+  bias_for_layer_norm: false
+  attention_layer_norm: true
+  attention_layer_norm_with_affine: true
+  norm_after: true
+  activation_type: swiglu
+  residual_dropout: 0.0
+  embedding_dropout: 0.0
+  max_sequence_length: 4096
+  vocab_size: 285416
+  embedding_size: 285440
+  eos_token_id: 100257
+  pad_token_id: 100277
+  init_device: meta
+  init_fn: normal
+  init_std: 0.02
+  init_cutoff_factor: 3
+
+softmax_auxiliary_loss: true
+auxiliary_loss_multiplier: 1e-5
+fused_loss: true
+
+compile: null
+
+optimizer:
+  name: adamw
+  learning_rate: 0.000074487
+  weight_decay: 0.1
+  eps: 1e-8
+  decay_norm_and_bias: true
+  decay_embeddings: false
+  betas:
+  - 0.9
+  - 0.95
+  metrics_log_interval: 1
+
+scheduler:
+  name: cosine_with_warmup
+  units: steps
+  t_warmup: 1000
+  alpha_f: 0
+  warmup_min_lr: 0
+
+tokenizer:
+  identifier: tokenizers/allenai_dolma2-vocab_expansion-nhird.json
+  truncate_direction: right
+
+save_folder: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/step2000-unsharded/data_influence
+save_overwrite: true
+
+save_interval: null
+save_interval_ephemeral: null
+save_num_checkpoints_to_keep: 0
+sharded_checkpointer: olmo_core
+
+save_interval_unsharded: null
+save_num_unsharded_checkpoints_to_keep: 0
+
+load_path: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/step2000-unsharded
+
+restore_dataloader: false
+reset_optimizer_state: true  # CHANGED: Keep optimizer state from checkpoint
+reset_trainer_state: true    # CHANGED: Keep trainer state from checkpoint
+no_pre_train_checkpoint: true
+
+max_duration: 1ep
+# stop_at: 11931                  # Relying on max_duration for anneals
+global_train_batch_size: 512
+device_train_microbatch_size: 4
+
+precision: amp_bf16
+
+fsdp:
+  wrapping_strategy: by_block_and_size
+  precision: mixed
+
+# activation_checkpointing: one_in_four
+
+max_grad_norm: 1.0
+max_grad_norm_ratio: null
+
+speed_monitor:
+  window_size: 1
+
+gen1_gc_interval: 10
+
+eval_on_load: false
+eval_interval: 100000
+eval_subset_num_batches: -1
+device_eval_batch_size: 16
+evaluators: 
+  - label: nhird-ppl-validation
+    data:
+      paths:
+        - ${LOCAL_ROOT}/data/preprocessed/nhird/valid_ids_olmo.npy
+
+data:
+  pad_direction: right
+  # generate_doc_lengths: true
+  num_workers: 8
+  drop_last: true
+  pin_memory: true
+  prefetch_factor: 8
+  persistent_workers: true
+  memmap_dtype: uint32
+  timeout: 0
+  instance_filter:
+    repetition_max_period: 13
+    repetition_min_period: 1
+    repetition_max_count: 32
+  paths:
+    # CHANGED: Train on validation data for influence computation
+    - ${LOCAL_ROOT}/data/preprocessed/nhird/valid_ids_olmo.npy
