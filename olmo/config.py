@@ -996,6 +996,12 @@ class TrainConfig(BaseConfig):
     If you restarting in order to train on a different dataset, set this to ``False``.
     """
 
+    keep_global_step: bool = False
+    """
+    When restarting, keep the global step and token counter from the checkpoint.
+    If you restarting in order to continue training, set this to ``True``.
+    """
+
     fast_forward_batches: Optional[int] = None
     """
     When restarting, use this to fast-forward the dataloader beyond the last checkpoint.

@@ -1,0 +1,177 @@
+run_name: phase2
+seed: 42
+dry_run: false
+
+wandb:
+  name: all_repetition_phase2
+  entity: cxcscmu
+  project: healthcare
+  group: random_mixture_dclm_nhird
+
+model:
+  d_model: 2048
+  n_heads: 16
+  n_layers: 16
+  mlp_ratio: 8
+  weight_tying: false
+  alibi: false
+  rope: true
+  rope_theta: 500000
+  flash_attention: true
+  attention_dropout: 0.0
+  include_bias: false
+  block_type: sequential
+  layer_norm_type: rms
+  layer_norm_with_affine: true
+  layer_norm_eps: 1e-6
+  bias_for_layer_norm: false
+  attention_layer_norm: true
+  attention_layer_norm_with_affine: true
+  norm_after: true
+  activation_type: swiglu
+  residual_dropout: 0.0
+  embedding_dropout: 0.0
+  max_sequence_length: 4096
+  vocab_size: 285416
+  embedding_size: 285440
+  eos_token_id: 100257
+  pad_token_id: 100277
+  init_device: meta
+  init_fn: normal
+  init_std: 0.02
+  init_cutoff_factor: 3
+
+softmax_auxiliary_loss: true
+auxiliary_loss_multiplier: 1e-5
+fused_loss: true
+
+compile: null
+
+optimizer:
+  name: adamw
+  learning_rate: 0.000074487
+  weight_decay: 0.1
+  eps: 1e-8
+  decay_norm_and_bias: true
+  decay_embeddings: false
+  betas:
+  - 0.9
+  - 0.95
+  metrics_log_interval: 1
+
+scheduler:
+  name: constant_with_warmup
+  units: steps
+  t_warmup: 1000
+  alpha_f: 0
+  warmup_min_lr: 0
+
+tokenizer:
+  identifier: tokenizers/allenai_dolma2-vocab_expansion-nhird.json
+  truncate_direction: right
+
+save_folder: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase2_dry
+save_overwrite: true
+
+save_interval: null
+save_interval_ephemeral: null
+save_num_checkpoints_to_keep: 0
+sharded_checkpointer: olmo_core
+
+save_interval_unsharded: 1000
+save_num_unsharded_checkpoints_to_keep: -1
+
+# Load from phase 1 final checkpoint
+load_path: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase1_dry/latest-unsharded
+
+restore_dataloader: false
+keep_global_step: true        # Keep global step and token counter from phase 1
+reset_optimizer_state: false  # Keep optimizer state from phase 1
+reset_trainer_state: false    # Keep trainer state from phase 1
+no_pre_train_checkpoint: true
+
+max_duration: 1ep
+global_train_batch_size: 512
+device_train_microbatch_size: 8
+
+precision: amp_bf16
+
+fsdp:
+  wrapping_strategy: null
+  sharding_strategy: SHARD_GRAD_OP
+  precision: mixed
+
+# activation_checkpointing: one_in_four
+
+max_grad_norm: 1.0
+max_grad_norm_ratio: null
+
+speed_monitor:
+  window_size: 1
+
+gen1_gc_interval: 10
+
+eval_on_load: false
+eval_interval: 200
+eval_subset_num_batches: -1
+device_eval_batch_size: 16
+evaluators:
+  - label: nhird-ppl-validation
+    data:
+      num_workers: 0
+      drop_last: true
+      # generate_doc_lengths: true
+      memmap_dtype: uint32
+      datasets:
+          nhird-validation:
+            - ${LOCAL_ROOT}/data/preprocessed/nhird/valid_ids_olmo.npy
+    subset_num_batches: 200
+
+  ##########################
+  # Downstream evaluations #
+  ##########################
+  - label: piqa
+    type: downstream
+
+  - label: hellaswag
+    type: downstream
+
+  - label: winogrande
+    type: downstream
+
+  - label: openbook_qa
+    type: downstream
+
+  - label: boolq
+    type: downstream
+
+  - label: sciq
+    type: downstream
+
+  - label: arc_easy
+    type: downstream
+
+  - label: arc_challenge
+    type: downstream
+
+data:
+  pad_direction: right
+  # generate_doc_lengths: true
+  num_workers: 8
+  drop_last: true
+  pin_memory: true
+  prefetch_factor: 8
+  persistent_workers: true
+  memmap_dtype: uint32
+  timeout: 0
+  instance_filter:
+    repetition_max_period: 13
+    repetition_min_period: 1
+    repetition_max_count: 32
+  paths:
+    #SOURCE: NHIRD (1.4BT)
+    - ${LOCAL_ROOT}/data/preprocessed/nhird/train_ids_olmo.npy
+    #SOURCE: dclm_path_24B.txt lines 1-16
+    - ${LOCAL_ROOT}/data/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0013/part-15-00000.npy
+    - ${LOCAL_ROOT}/data/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0027/part-24-00000.npy
+    - ${LOCAL_ROOT}/data/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0028/part-14-00000.npy
