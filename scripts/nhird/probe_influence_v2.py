@@ -6,7 +6,7 @@ This script extends train.py to compute data influence by:
 2. Computing initial loss (loss0) on training data
 3. Fine-tuning on validation data using train.py's Trainer
 4. Computing updated loss (loss1) on training data
-5. Computing influence = loss1 - loss0
+5. Computing influence = loss0 - loss1
 
 This script reuses train.py's entire infrastructure for FSDP compatibility.
 """
@@ -364,7 +364,7 @@ def main(cfg: TrainConfig) -> None:
 
         # Compute influence
         if get_global_rank() == 0:
-            influence = loss1 - loss0
+            influence = loss0 - loss1
             np.save(output_dir / "influence.npy", influence)
             log.info(f"Loss0 - Mean: {np.mean(loss0):.4f}, Std: {np.std(loss0):.4f}")
             log.info(f"Loss1 - Mean: {np.mean(loss1):.4f}, Std: {np.std(loss1):.4f}")
