@@ -1,5 +1,5 @@
 run_name: dclm_1.4B_all_repetition
-seed: 42
+seed: 87
 dry_run: false
 
 wandb:
@@ -81,9 +81,10 @@ sharded_checkpointer: olmo_core
 save_interval_unsharded: 539
 save_num_unsharded_checkpoints_to_keep: -1
 
-load_path: ${LOCAL_ROOT}/out/OLMo-300M/dclm_1.4B_all_repetition/latest-unsharded
+load_path: ${LOCAL_ROOT}/out/OLMo-300M/dclm_1.4B_all_repetition/step8624-unsharded
 
-restore_dataloader: true
+restore_dataloader: false
+keep_global_step: true
 reset_optimizer_state: false
 reset_trainer_state: false
 no_pre_train_checkpoint: true
