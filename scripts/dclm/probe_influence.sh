@@ -25,7 +25,7 @@ export CHECKPOINT_DIR="${LOCAL_ROOT}/${CHECKPOINT_PATH}"
 mkdir -p "$(dirname "${CHECKPOINT_DIR}")"
 if [[ ! -d "${CHECKPOINT_DIR}" ]]; then
     echo "Checkpoint directory missing, downloading..."
-    gcloud storage cp -r "${GCS_ROOT}/${CHECKPOINT_PATH}" "${CHECKPOINT_DIR}"
+    gcloud storage cp -r "${GCS_ROOT}/${CHECKPOINT_PATH}" "$(dirname "${CHECKPOINT_DIR}")"
 else
     echo "Checkpoint directory exists, skipping download"
 fi
