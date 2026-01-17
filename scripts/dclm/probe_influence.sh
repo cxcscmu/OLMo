@@ -17,9 +17,21 @@ set -euo pipefail
 
 source .env
 
+GCS_ROOT="gs://cmu-gpucloud-zichunyu/healthcare/olmo"
+
+# Download checkpoint if needed
+CHECKPOINT_PATH="out/OLMo-300M/dclm_1.4B_all_repetition/step8624-unsharded"
+export CHECKPOINT_DIR="${LOCAL_ROOT}/${CHECKPOINT_PATH}"
+mkdir -p "$(dirname "${CHECKPOINT_DIR}")"
+if [[ ! -d "${CHECKPOINT_DIR}" ]]; then
+    echo "Checkpoint directory missing, downloading..."
+    gcloud storage cp -r "${GCS_ROOT}/${CHECKPOINT_PATH}" "${CHECKPOINT_DIR}"
+else
+    echo "Checkpoint directory exists, skipping download"
+fi
+
 # Configuration
 CONFIG_PATH="configs/dclm/probe-influence.yaml"
-export CHECKPOINT_DIR="${LOCAL_ROOT}/out/OLMo-300M/dclm_1.4B_all_repetition/step8624-unsharded"
 export CHECKPOINT_NAME=$(basename "${CHECKPOINT_DIR}")
 export OUTPUT_DIR="${CHECKPOINT_DIR}/data_influence"
 
