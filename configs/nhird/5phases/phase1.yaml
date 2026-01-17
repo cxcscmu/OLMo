@@ -1,13 +1,12 @@
-run_name: random_mixture_dclm_nhird
+run_name: phase1
 seed: 42
 dry_run: false
 
-
-wandb:  
-  name: ${run_name}
+wandb:
+  name: all_repetition_phase1
   entity: cxcscmu
   project: healthcare
-  group: OLMo-2_Midtraining
+  group: random_mixture_dclm_nhird
 
 model:
   d_model: 2048
@@ -61,7 +60,7 @@ optimizer:
   metrics_log_interval: 1
 
 scheduler:
-  name: cosine_with_warmup
+  name: constant_with_warmup
   units: steps
   t_warmup: 1000
   alpha_f: 0
@@ -71,7 +70,7 @@ tokenizer:
   identifier: tokenizers/allenai_dolma2-vocab_expansion-nhird.json
   truncate_direction: right
 
-save_folder: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain
+save_folder: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase1
 save_overwrite: true
 
 save_interval: null
@@ -79,18 +78,18 @@ save_interval_ephemeral: null
 save_num_checkpoints_to_keep: 0
 sharded_checkpointer: olmo_core
 
-save_interval_unsharded: 500
-save_num_unsharded_checkpoints_to_keep: 3
+save_interval_unsharded: 1000
+save_num_unsharded_checkpoints_to_keep: -1
 
 load_path: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-unsharded
 
 restore_dataloader: false
+keep_global_step: false
 reset_optimizer_state: true
 reset_trainer_state: true
 no_pre_train_checkpoint: true
 
 max_duration: 1ep
-# stop_at: 11931                  # Relying on max_duration for anneals
 global_train_batch_size: 512
 device_train_microbatch_size: 8
 
@@ -112,9 +111,9 @@ speed_monitor:
 gen1_gc_interval: 10
 
 eval_on_load: true
-eval_interval: 1000
+eval_interval: 500
 eval_subset_num_batches: -1
-device_eval_batch_size: 8
+device_eval_batch_size: 16
 evaluators:
   - label: nhird-ppl-validation
     data:
@@ -126,28 +125,6 @@ evaluators:
           nhird-validation:
             - ${LOCAL_ROOT}/data/preprocessed/nhird/valid_ids_olmo.npy
     subset_num_batches: 200
-  #       c4_en-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/c4_en/val/part-0-00000.npy
-  #       dolma_books-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_books/val/part-0-00000.npy
-  #       dolma_common-crawl-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_common-crawl/val/part-0-00000.npy
-  #       dolma_pes2o-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_pes2o/val/part-0-00000.npy
-  #       dolma_reddit-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_reddit/val/part-0-00000.npy
-  #       dolma_stack-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_stack/val/part-0-00000.npy
-  #       dolma_wiki-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/dolma_wiki/val/part-0-00000.npy
-  #       ice-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/ice/val/part-0-00000.npy
-  #       m2d2_s2orc-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/m2d2_s2orc/val/part-0-00000.npy
-  #       pile-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/pile/val/part-0-00000.npy
-  #       wikitext_103-validation:
-  #         - /weka/oe-training-default/ai2-llm/eval-data/perplexity/v3_small_dolma2-tokenizer/wikitext_103/val/part-0-00000.npy
 
   ##########################
   # Downstream evaluations #
@@ -175,72 +152,6 @@ evaluators:
 
   - label: arc_challenge
     type: downstream
-
-  # - label: copa
-  #   type: downstream
-
-  #- label: rte
-  #  type: downstream
-
-  #- label: commitment_bank
-  #  type: downstream
-
-  #- label: sst2
-  #  type: downstream
-
-  # - label: commonsense_qa
-  #   type: downstream
-
-  # - label: social_iqa
-  #   type: downstream
-
-  # - label: mmlu_stem_var
-  #   type: downstream
-
-  # - label: mmlu_humanities_var
-  #   type: downstream
-
-  # - label: mmlu_social_sciences_var
-  #   type: downstream
-
-  # - label: mmlu_other_var
-  #   type: downstream
-
-  # - label: mmlu_stem_mc_5shot
-  #   type: downstream
-
-  # - label: mmlu_humanities_mc_5shot
-  #   type: downstream
-
-  # - label: mmlu_social_sciences_mc_5shot
-  #   type: downstream
-
-  # - label: mmlu_other_mc_5shot
-  #   type: downstream
-
-  # - label: mmlu_stem_mc_5shot_test
-  #   type: downstream
-
-  # - label: mmlu_humanities_mc_5shot_test
-  #   type: downstream
-
-  # - label: mmlu_social_sciences_mc_5shot_test
-  #   type: downstream
-
-  # - label: mmlu_other_mc_5shot_test
-  #   type: downstream
-
-  # - label: basic_arithmetic
-  #   type: downstream
-
-  # - label: trivia_qa_wiki_ppl
-  #   type: downstream
-
-  # - label: natural_qs_open_ppl
-  #   type: downstream
-
-  # - label: arc_easy_ppl
-  #   type: downstream
 
 data:
   pad_direction: right
