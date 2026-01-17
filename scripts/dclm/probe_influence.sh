@@ -61,10 +61,11 @@ echo "Number of GPUs: ${NUM_GPUS}"
 echo "=================================================="
 
 # Run with torchrun
-# torchrun \
-#   --nproc_per_node="${NUM_GPUS}" \
-#   scripts/nhird/probe_influence_v2.py \
-#   "${CONFIG_PROCESSED}"
+torchrun \
+  --nproc_per_node="${NUM_GPUS}" \
+  --master_port=$((RANDOM + 20000)) \
+  scripts/nhird/probe_influence_v2.py \
+  "${CONFIG_PROCESSED}"
 torchrun \
   --nproc_per_node="$NUM_GPUS" \
   scripts/train.py "${CONFIG_PROCESSED}"
