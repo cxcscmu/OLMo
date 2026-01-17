@@ -119,7 +119,7 @@ evaluators:
       # generate_doc_lengths: true
       memmap_dtype: uint32
       datasets:
-          nhird-validation:
+          dclm-validation:
             - ${LOCAL_ROOT}/data/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0000/part-00-00000.npy
     subset_num_batches: 200
 
