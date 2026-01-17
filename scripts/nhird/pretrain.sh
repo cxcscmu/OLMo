@@ -20,8 +20,8 @@ mkdir -p "${LOCAL_ROOT}"
 if [[ ! -d "${LOCAL_ROOT}/data" ]]; then
   gcloud storage cp -r "${GCS_ROOT}/data" ${LOCAL_ROOT}
 fi
-if [[ ! -d "${LOCAL_ROOT}/pretrained_ckpt" ]]; then
-  gcloud storage cp -r "${GCS_ROOT}/pretrained_ckpt" ${LOCAL_ROOT}
+if [[ ! -d "${LOCAL_ROOT}/out" ]]; then
+  gcloud storage cp -r "${GCS_ROOT}/out" ${LOCAL_ROOT}
 fi
 
 # Count visible GPUs
@@ -34,6 +34,13 @@ if [ "$NUM_GPUS" -eq 0 ]; then
   exit 1
 fi
 
+# Create a processed config with environment variables substituted
+CONFIG_PROCESSED="${CONFIG_PATH}_$$.yaml"
+envsubst < "${CONFIG_PATH}" > "${CONFIG_PROCESSED}"
+
+# Ensure cleanup on exit (success or failure)
+trap "rm -f '${CONFIG_PROCESSED}'" EXIT
+
 torchrun \
   --nproc_per_node="$NUM_GPUS" \
-  scripts/train.py "${CONFIG_PATH}"
+  scripts/train.py "${CONFIG_PROCESSED}"
