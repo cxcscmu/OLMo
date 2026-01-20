@@ -1,5 +1,5 @@
 """
-Script for preparing the Tulu V2 data for fine-tuning an OLMo model.
+Script for preparing the SciQ data for fine-tuning an OLMo model.
 """
 
 import logging
@@ -24,28 +24,29 @@ def main(opts) -> None:
     else:
         tokenizer = Tokenizer.from_pretrained(opts.tokenizer, eos_token_id=opts.eos, pad_token_id=opts.pad)
 
-    dataset = ds.load_dataset("allenai/tulu-v2-sft-mixture", split="train")
-    dataset = dataset.filter(lambda x: x["dataset"] == "flan_v2")
-    print("FLAN V2 dataset size:", len(dataset))
+    dataset = ds.load_dataset("sciq", split="train")
+    print("SciQ train dataset size:", len(dataset))
 
     log.info("Tokenizing dataset...")
     dataset = dataset.map(
         partial(preprocess, tokenizer=tokenizer, max_seq_len=opts.seq_len),
         batched=False,
-        remove_columns=["dataset", "id", "messages"],
-        num_proc=opts.num_proc,  # type: ignore
+        remove_columns=[
+            "question",
+            "distractor3",
+            "distractor1",
+            "distractor2",
+            "correct_answer",
+            "support",
+        ],
+        num_proc=opts.num_proc,
     )
-
-    log.info("Filtering dataset...")
-    n = len(dataset)  # type: ignore
-    dataset = dataset.filter(filter, batched=False, num_proc=opts.num_proc)  # type: ignore
-    log.info(f"Filtered out {n - len(dataset):,d} examples")
 
     log.info("Counting tokens...")
     total_tokens = 0
     for ex in track(dataset):
-        assert len(ex["input_ids"]) == opts.seq_len  # type: ignore
-        total_tokens += len(ex["input_ids"])  # type: ignore
+        assert len(ex["input_ids"]) == opts.seq_len
+        total_tokens += len(ex["input_ids"])
     log.info(f"Total tokens: {total_tokens:,d}")
 
     log.info(f"Saving results to '{opts.output_dir}'...")
@@ -66,9 +67,9 @@ def main(opts) -> None:
     )
     offset = 0
     for ex in track(dataset):
-        ex_len = len(ex["input_ids"])  # type: ignore
-        input_ids_file[offset : offset + ex_len] = ex["input_ids"]  # type: ignore
-        label_mask_file[offset : offset + ex_len] = ex["label_mask"]  # type: ignore
+        ex_len = len(ex["input_ids"])
+        input_ids_file[offset : offset + ex_len] = ex["input_ids"]
+        label_mask_file[offset : offset + ex_len] = ex["label_mask"]
         offset += ex_len
     input_ids_file.flush()
     label_mask_file.flush()
@@ -76,35 +77,33 @@ def main(opts) -> None:
     log.info("Done!")
 
 
-def filter(example):
-    return example["n_labels"] > 0
-
-
 def preprocess(example, tokenizer: Tokenizer, max_seq_len: int):
-    input_ids = [tokenizer.eos_token_id]
-    label_mask = [False]
+    # Format: "{support}\nQuestion: {question}\nAnswer:" (masked) + " {correct_answer}" (not masked)
+    source = example["support"]
+    question = example["question"]
+    answer_text = example["correct_answer"]
 
-    for msg in example["messages"]:
-        role_tokens = tokenizer.encode(f"<|{msg['role']}|>\n", add_special_tokens=False)
-        label_mask += [False] * len(role_tokens)
-        input_ids += role_tokens
+    # Build query following doc_to_text format
+    query = "{}\nQuestion: {}\nAnswer:".format(source, question).strip()
 
-        if msg["role"] == "assistant":
-            content_tokens = tokenizer.encode(
-                msg["content"].strip() + tokenizer.eos_token + "\n", add_special_tokens=False
-            )
-            label_mask += [True] * len(content_tokens)
-            # mask out the last '\n'
-            assert content_tokens[-2] == tokenizer.eos_token_id
-            label_mask[-1] = False
-        else:
-            content_tokens = tokenizer.encode(msg["content"].strip() + "\n", add_special_tokens=False)
-            label_mask += [False] * len(content_tokens)
-        input_ids += content_tokens
+    # Tokenize query part (masked - not trained on)
+    query_tokens = tokenizer.encode(query, add_special_tokens=False)
+    query_mask = [False] * len(query_tokens)
 
+    # Tokenize answer part (not masked - trained on)
+    # Include EOS token at the end
+    answer_tokens = tokenizer.encode(" " + answer_text + tokenizer.eos_token, add_special_tokens=False)
+    answer_mask = [True] * len(answer_tokens)
+
+    # Combine
+    input_ids = query_tokens + answer_tokens
+    label_mask = query_mask + answer_mask
+
+    # Truncate if needed
     input_ids = input_ids[:max_seq_len]
     label_mask = label_mask[:max_seq_len]
 
+    # Pad if needed
     if len(input_ids) < max_seq_len:
         pad_len = max_seq_len - len(input_ids)
         input_ids += [tokenizer.pad_token_id] * pad_len
@@ -117,7 +116,7 @@ def preprocess(example, tokenizer: Tokenizer, max_seq_len: int):
 
 
 def get_parser() -> ArgumentParser:
-    parser = ArgumentParser(description="Prepare Tulu V2 dataset")
+    parser = ArgumentParser(description="Prepare SciQ dataset")
     parser.add_argument("output_dir", type=str, help="""Directory to save the results to.""")
     parser.add_argument(
         "-t",
@@ -133,8 +132,9 @@ def get_parser() -> ArgumentParser:
     return parser
 
 
-# python scripts/prepare_tulu_data.py /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/flan_v2 \n
-#  -t olmo_data/tokenizers/allenai_dolma2.json \n
+# Example usage:
+# python scripts/prepare_sciq_data.py /path/to/output/sciq \
+#  -t olmo_data/tokenizers/allenai_dolma2.json \
 #  -s 4096 -j 8 --eos 100257 --pad 100277
 if __name__ == "__main__":
     prepare_cli_environment()
