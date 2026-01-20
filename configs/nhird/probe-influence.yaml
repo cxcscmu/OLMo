@@ -118,7 +118,7 @@ evaluators:
   - label: nhird-ppl-validation
     data:
       paths:
-        - ${LOCAL_ROOT}/data/preprocessed/nhird/train_ids_olmo_1.4B.npy
+        - ${LOCAL_ROOT}/data/preprocessed/nhird/train_ids_olmo_1.14B.npy
 
 data:
   pad_direction: right
