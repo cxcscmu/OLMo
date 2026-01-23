@@ -1,9 +1,8 @@
 """
-Script for preparing the HellaSwag data for fine-tuning an OLMo model.
+Script for preparing the PiQA data for fine-tuning an OLMo model.
 """
 
 import logging
-import re
 from argparse import ArgumentParser
 from functools import partial
 from pathlib import Path
@@ -25,26 +24,15 @@ def main(opts) -> None:
     else:
         tokenizer = Tokenizer.from_pretrained(opts.tokenizer, eos_token_id=opts.eos, pad_token_id=opts.pad)
 
-    dataset = ds.load_dataset("hellaswag", split="train")
-    # dataset = dataset.select(np.random.RandomState(42).choice(len(dataset), size=2250 * 4, replace=False))
-    print("HellaSwag train dataset size:", len(dataset))
+    dataset = ds.load_dataset("ybisk/piqa", split="train")
+    # dataset = dataset.select(np.random.RandomState(42).choice(len(dataset), size=2250, replace=False))
+    print("PiQA train dataset size:", len(dataset))
 
     log.info("Tokenizing dataset...")
     dataset = dataset.map(
         partial(preprocess, tokenizer=tokenizer, max_seq_len=opts.seq_len),
         batched=False,
-        remove_columns=[
-            "ind",
-            "activity_label",
-            "ctx_a",
-            "ctx_b",
-            "ctx",
-            "endings",
-            "source_id",
-            "split",
-            "split_type",
-            "label",
-        ],
+        remove_columns=["goal", "sol1", "sol2", "label"],
         num_proc=opts.num_proc,
     )
 
@@ -83,24 +71,16 @@ def main(opts) -> None:
     log.info("Done!")
 
 
-def preprocess_text(text):
-    """Preprocess text following HellaSwag conventions."""
-    text = text.strip()
-    # NOTE: Brackets are artifacts of the WikiHow dataset portion of HellaSwag.
-    text = text.replace(" [title]", ". ")
-    text = re.sub("\\[.*?\\]", "", text)
-    text = text.replace("  ", " ")
-    return text
-
-
 def preprocess(example, tokenizer: Tokenizer, max_seq_len: int):
-    # Build context: activity_label + ctx_a + ctx_b (capitalized)
-    ctx = example["ctx_a"] + " " + example["ctx_b"].capitalize()
-    query = preprocess_text(example["activity_label"] + ": " + ctx)
+    # Format: "Question: {goal}\nAnswer:" (masked) + " {correct_solution}" (not masked)
+    goal = example["goal"]
+    label = example["label"]
 
-    # Get the correct ending
-    gold_idx = int(example["label"])
-    answer_text = preprocess_text(example["endings"][gold_idx])
+    # Get the correct solution (sol1 if label=0, sol2 if label=1)
+    answer_text = example["sol1"] if label == 0 else example["sol2"]
+
+    # Build query following doc_to_text format
+    query = "Question: " + goal + "\nAnswer:"
 
     # Tokenize query part (masked - not trained on)
     query_tokens = tokenizer.encode(query, add_special_tokens=False)
@@ -132,7 +112,7 @@ def preprocess(example, tokenizer: Tokenizer, max_seq_len: int):
 
 
 def get_parser() -> ArgumentParser:
-    parser = ArgumentParser(description="Prepare HellaSwag dataset")
+    parser = ArgumentParser(description="Prepare PiQA dataset")
     parser.add_argument("output_dir", type=str, help="""Directory to save the results to.""")
     parser.add_argument(
         "-t",
@@ -149,7 +129,7 @@ def get_parser() -> ArgumentParser:
 
 
 # Example usage:
-# python scripts/prepare_hellaswag_data.py /path/to/output/hellaswag \
+# python scripts/prepare_piqa_data.py /path/to/output/piqa \
 #  -t olmo_data/tokenizers/allenai_dolma2.json \
 #  -s 4096 -j 8 --eos 100257 --pad 100277
 if __name__ == "__main__":
