@@ -114,7 +114,7 @@ eval_on_load: false
 eval_interval: 100000
 eval_subset_num_batches: -1
 device_eval_batch_size: 16
-evaluators: 
+evaluators:
   - label: nhird-ppl-validation
     data:
       paths:
