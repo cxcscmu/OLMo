@@ -217,6 +217,7 @@ class Trainer:
     evaluators: List[Evaluator]
     epoch: Optional[int] = None
     global_step: int = 0
+    base_step: int = 0
     global_train_examples_seen_this_epoch: int = 0
     """Tracks the global number of training examples seen in the current epoch for the purpose of restoring
     the data loader position on restarts."""
@@ -261,7 +262,7 @@ class Trainer:
     @property
     def max_steps(self) -> int:
         if isinstance(self.cfg.max_duration, int):
-            return self.cfg.max_duration
+            return self.base_step + self.cfg.max_duration
         elif isinstance(self.cfg.max_duration, str):
             if self.cfg.max_duration.endswith("T"):
                 # convert to float *first* to handle scientific notation
@@ -271,7 +272,7 @@ class Trainer:
                 return self.global_step + steps_remaining
             elif self.cfg.max_duration.endswith("ep"):
                 max_epochs = int(self.cfg.max_duration[:-2].strip())
-                return max_epochs * self.batches_per_epoch
+                return self.base_step + max_epochs * self.batches_per_epoch
             else:
                 # convert to float *first* to handle scientific notation
                 return int(float(self.cfg.max_duration))
@@ -376,6 +377,7 @@ class Trainer:
         if not self.cfg.restore_dataloader:
             self.epoch = 0
             self.global_step = 0 if not self.cfg.keep_global_step else self.global_step
+            self.base_step = self.global_step
             self.global_train_tokens_seen = 0 if not self.cfg.keep_global_step else self.global_train_tokens_seen
             self.global_train_examples_seen_this_epoch = 0
         elif self.epoch is None:
@@ -1113,7 +1115,7 @@ class Trainer:
             else:
                 self.cfg.stop_at = min(self.cfg.stop_at, self.global_step + self.cfg.stop_after)
         if self.cfg.stop_at is None:
-            self.cfg.stop_at = self.max_steps + 10
+            self.cfg.stop_at = self.max_steps
 
         self._start_time = time.time()
         self._gc_init_state = gc.isenabled()  # cache if garbage collection is enabled, reset on close.
