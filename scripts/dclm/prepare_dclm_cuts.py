@@ -123,13 +123,3 @@ for phase_file in phase_files:
     print(f"Verification: {len(verify_data):,} tokens written")
 
     print(f"✓ {phase_name} complete!")
-
-print(f"\n{'=' * 80}")
-print("All phases processed successfully!")
-print(f"{'=' * 80}")
-print(f"\nOutput files saved to: {output_dir}")
-print("\nGenerated files:")
-for npy_file in sorted(output_dir.glob("train_ids_olmo_*.npy")):
-    size = np.memmap(npy_file, dtype=np.uint32, mode="r").shape[0]
-    print(f"  - {npy_file.name}: {size:,} tokens ({size / 1e9:.4f}B)")
-print("=" * 80)
