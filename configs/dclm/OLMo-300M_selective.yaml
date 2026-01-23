@@ -1,15 +1,15 @@
-run_name: phase9
-seed: 42
+run_name: dclm_1.4B_selective_repetition
+seed: 87
 dry_run: false
 
 wandb:
-  name: selective_repetition_phase9
+  name: dclm_1.4B_selective_repetition
   entity: cxcscmu
   project: healthcare
-  group: dynamic_selective_repetition
+  group: OLMo-300M_dynamic_selective_repetition
 
 model:
-  d_model: 2048
+  d_model: 1024
   n_heads: 16
   n_layers: 16
   mlp_ratio: 8
@@ -32,8 +32,8 @@ model:
   residual_dropout: 0.0
   embedding_dropout: 0.0
   max_sequence_length: 4096
-  vocab_size: 285416
-  embedding_size: 285440
+  vocab_size: 100278
+  embedding_size: 100352
   eos_token_id: 100257
   pad_token_id: 100277
   init_device: meta
@@ -49,7 +49,7 @@ compile: null
 
 optimizer:
   name: adamw
-  learning_rate: 0.000074487
+  learning_rate: 6.0e-4
   weight_decay: 0.1
   eps: 1e-8
   decay_norm_and_bias: true
@@ -63,14 +63,14 @@ scheduler:
   name: constant_with_warmup
   units: steps
   t_warmup: 1000
-  alpha_f: 0
+  alpha_f: 0.1
   warmup_min_lr: 0
 
 tokenizer:
-  identifier: tokenizers/allenai_dolma2-vocab_expansion-nhird.json
+  identifier: tokenizers/allenai_dolma2.json
   truncate_direction: right
 
-save_folder: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase9_selective
+save_folder: ${OUTPUT_DIR}
 save_overwrite: true
 
 save_interval: null
@@ -78,10 +78,10 @@ save_interval_ephemeral: null
 save_num_checkpoints_to_keep: 0
 sharded_checkpointer: olmo_core
 
-save_interval_unsharded: 1000
+save_interval_unsharded: 539
 save_num_unsharded_checkpoints_to_keep: -1
 
-load_path: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase8_selective/step8210-unsharded
+load_path: ${CHECKPOINT_DIR}
 
 restore_dataloader: false
 keep_global_step: true
@@ -100,8 +100,6 @@ fsdp:
   sharding_strategy: SHARD_GRAD_OP
   precision: mixed
 
-# activation_checkpointing: one_in_four
-
 max_grad_norm: 1.0
 max_grad_norm_ratio: null
 
@@ -110,20 +108,19 @@ speed_monitor:
 
 gen1_gc_interval: 10
 
-eval_on_load: false
-eval_interval: 200
+eval_interval: 539
 eval_subset_num_batches: -1
 device_eval_batch_size: 16
 evaluators:
-  - label: nhird-ppl-validation
+  - label: dclm-ppl-validation
     data:
       num_workers: 0
       drop_last: true
       # generate_doc_lengths: true
       memmap_dtype: uint32
       datasets:
-          nhird-validation:
-            - ${LOCAL_ROOT}/data/preprocessed/nhird/valid_ids_olmo.npy
+          dclm-validation:
+            - ${LOCAL_ROOT}/data/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0000/part-00-00000.npy
     subset_num_batches: 200
 
   ##########################
@@ -153,10 +150,16 @@ evaluators:
   - label: arc_challenge
     type: downstream
 
+  - label: commonsense_qa
+    type: downstream
+
+  - label: social_iqa
+    type: downstream
+
 data:
   pad_direction: right
   # generate_doc_lengths: true
-  num_workers: 8
+  num_workers: 32
   drop_last: true
   pin_memory: true
   prefetch_factor: 8
@@ -168,7 +171,5 @@ data:
     repetition_min_period: 1
     repetition_max_count: 32
   paths:
-    #SOURCE: NHIRD (0.456BT)
-    - ${LOCAL_ROOT}/data/preprocessed/nhird/phase8_selective_step8210-unsharded_selection/train_ids_olmo_0.456B.npy
-    #SOURCE: dclm_path_24B.txt lines 49-64
-    - ${LOCAL_ROOT}/data/preprocessed/dclm/train_ids_olmo_0.456B.npy
+    #SOURCE: dclm_path_24B.txt lines 17-32
+    - ${DATA_PATH}

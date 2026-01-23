@@ -1,9 +1,9 @@
-run_name: phase9
+run_name: phase10
 seed: 42
 dry_run: false
 
 wandb:
-  name: selective_repetition_phase9
+  name: selective_repetition_phase10
   entity: cxcscmu
   project: healthcare
   group: dynamic_selective_repetition
@@ -70,7 +70,7 @@ tokenizer:
   identifier: tokenizers/allenai_dolma2-vocab_expansion-nhird.json
   truncate_direction: right
 
-save_folder: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase9_selective
+save_folder: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase10_selective
 save_overwrite: true
 
 save_interval: null
@@ -81,7 +81,7 @@ sharded_checkpointer: olmo_core
 save_interval_unsharded: 1000
 save_num_unsharded_checkpoints_to_keep: -1
 
-load_path: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase8_selective/step8210-unsharded
+load_path: ${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase9_selective/step8628-unsharded
 
 restore_dataloader: false
 keep_global_step: true
@@ -169,6 +169,6 @@ data:
     repetition_max_count: 32
   paths:
     #SOURCE: NHIRD (0.456BT)
-    - ${LOCAL_ROOT}/data/preprocessed/nhird/phase8_selective_step8210-unsharded_selection/train_ids_olmo_0.456B.npy
+    - ${LOCAL_ROOT}/data/preprocessed/nhird/phase9_selective_step8628-unsharded_selection/train_ids_olmo_0.456B.npy
     #SOURCE: dclm_path_24B.txt lines 49-64
-    - ${LOCAL_ROOT}/data/preprocessed/dclm/train_ids_olmo_0.456B.npy
+    - ${LOCAL_ROOT}/data/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0020/part-10-00000.npy
