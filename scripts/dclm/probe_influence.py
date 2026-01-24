@@ -4,7 +4,7 @@
 This script extends train.py to compute data influence by:
 1. Loading a checkpoint (theta_hat)
 2. Computing initial loss (loss0) on training data
-3. Fine-tuning on validation data using train.py's Trainer
+3. Loading a validation-updated checkpoint (theta_hat - eta * grad_val)
 4. Computing updated loss (loss1) on training data
 5. Computing influence = loss0 - loss1
 
@@ -14,12 +14,12 @@ This script reuses train.py's entire infrastructure for FSDP compatibility.
 import logging
 import os
 import sys
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict
 
 import numpy as np
 import torch
-import wandb
 import torch.distributed as dist
 import torch.multiprocessing as mp
 from datetime import timedelta
@@ -43,7 +43,6 @@ from olmo.torch_util import (
     get_local_rank,
     get_world_size,
     move_to_device,
-    peak_gpu_memory,
     seed_all,
 )
 from olmo.train import Trainer
@@ -138,7 +137,7 @@ def compute_per_example_losses(
     """
     num_examples = len(data_loader.dataset)
     if get_global_rank() == 0:
-        log.info(f"Total examples to evaluate: {num_examples:,d}")  # 1,393,144
+        log.info(f"Total examples to evaluate: {num_examples:,d}")  # 276,229
         log.info(f"Examples per rank: ~{num_examples // get_world_size():,d}")
 
     # Initialize with zeros - each rank will fill in its subset
@@ -181,86 +180,36 @@ def compute_per_example_losses(
     return losses
 
 
-def main(cfg: TrainConfig) -> None:
-    """Main influence computation logic.
+def log_model_fingerprint(tag: str, model: torch.nn.Module) -> None:
+    with torch.no_grad():
+        for name, param in model.named_parameters():
+            if param is None or param.numel() == 0:
+                continue
+            value = param.detach().float().sum().item()
+            log.info(f"{tag} | {name} sum={value:.6e}")
+            break
 
-    This follows train.py's structure but adds influence computation steps.
+
+def compute_losses_with_checkpoint(
+    cfg: TrainConfig,
+    checkpoint_path: str,
+    train_eval_loader: DataLoader,
+    device: torch.device,
+    desc: str = "Computing losses",
+) -> np.ndarray:
+    """Load a checkpoint and compute per-example losses.
+
+    This creates a fresh trainer instance to avoid any cached state from FSDP.
     """
-    # Get influence-specific config from command line args
-    output_dir = Path(cfg.save_folder)
-    eval_batch_size = cfg.device_eval_batch_size
+    log.info(f"Building trainer for checkpoint: {checkpoint_path}")
 
-    log.info("=" * 60)
-    log.info("Data Influence Computation")
-    log.info("=" * 60)
-    log.info(f"Checkpoint: {cfg.load_path}")
-    log.info(f"Training data (for eval): {cfg.evaluators[0].data.paths}")
-    log.info(f"Validation data (for training): {cfg.data.paths}")
-    log.info(f"Output directory: {output_dir}")
-    log.info(f"Validation training steps: {cfg.max_duration}")
-    log.info(f"Global batch size: {cfg.global_train_batch_size}")
-    log.info(f"Eval batch size: {eval_batch_size}")
-    log.info("=" * 60)
-
-    log_extra_field("run_name", cfg.run_name)
-
-    barrier()
-
-    # Set CUDA device (from train.py)
-    if torch.cuda.is_available():
-        torch.cuda.set_device(f"cuda:{get_local_rank()}")
-        torch.cuda.empty_cache()
-        device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
-    else:
-        device = torch.device("cpu")
-
-    # Fill configuration options (from train.py)
-    cfg.model.precision = cfg.precision
-    cfg.device_train_batch_size = cfg.global_train_batch_size // get_world_size()
-    assert cfg.device_train_batch_size is not None
-    cfg.device_train_grad_accum = cfg.device_train_batch_size // cfg.device_train_microbatch_size
-
-    barrier()
-
-    # Maybe start W&B run.
-    if cfg.wandb is not None and (get_global_rank() == 0 or not cfg.wandb.rank_zero_only):
-        wandb_dir = Path(cfg.save_folder) / "wandb"
-        wandb_dir.mkdir(parents=True, exist_ok=True)
-        wandb.init(
-            dir=str(wandb_dir),
-            project=cfg.wandb.project,
-            entity=cfg.wandb.entity,
-            group=cfg.wandb.group,
-            name=cfg.wandb.name,
-            tags=cfg.wandb.tags,
-            config=cfg.asdict(exclude=["wandb"]),
-        )
-
-    barrier()
-
-    # Set seed
-    seed_all(cfg.seed)
-
-    # Build validation dataloader (for training) - use standard build_train_dataloader
-    log.info("Building validation dataloader (for training)...")
+    # Build validation dataloader (for training)
     valid_train_loader = build_train_dataloader(cfg)
 
-    # Build training dataloader (for evaluation) - use indexed loader
-    log.info(f"Building training dataloader (for evaluation)...")
-    train_eval_loader = build_indexed_dataloader(cfg)
-
-    barrier()
-
-    # Initialize model (following train.py exactly)
-    log.info("Building model...")
+    # Initialize model
     olmo_model = OLMo(cfg.model)
-    log.info(f"Total number of parameters: {olmo_model.num_params():,d}")
-    log.info(f"Number of non-embedding parameters: {olmo_model.num_params(include_embedding=False):,d}")
-    log.info(f"Peak GPU Memory (MB) before wrapping: {int(peak_gpu_memory() or 0)}")
 
-    # Compile one block at a time.
+    # Compile one block at a time
     if cfg.compile is not None:
         if cfg.model.block_group_size != 1:
             raise OLMoConfigurationError("Compile is only supported with block_group_size 1.")
@@ -269,12 +218,11 @@ def main(cfg: TrainConfig) -> None:
 
     olmo_model.set_activation_checkpointing(cfg.activation_checkpointing)
 
-    # Wrap model with FSDP/DDP (following train.py exactly)
+    # Wrap model with FSDP/DDP
     if cfg.distributed_strategy == DistributedStrategy.fsdp:
         from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, ShardingStrategy
         from packaging import version
 
-        log.info("Wrapping model with FSDP...")
         assert cfg.fsdp is not None
         wrap_policy = olmo_model.get_fsdp_wrap_policy(cfg.fsdp.wrapping_strategy)
 
@@ -325,18 +273,15 @@ def main(cfg: TrainConfig) -> None:
         # Single GPU or DDP
         from olmo.torch_util import SingleAccelerator
 
-        param_init_fn = None
         olmo_model = olmo_model.to(device)
         dist_model = SingleAccelerator(olmo_model)
         olmo_model.reset_parameters()
-
-    log.info(f"Peak GPU Memory (MB) after wrapping: {int(peak_gpu_memory() or 0)}")
 
     # Build optimizer and scheduler
     optim = build_optimizer(cfg, dist_model)
     scheduler = build_scheduler(cfg)
 
-    # Create Trainer
+    # Create Trainer and load checkpoint
     with Trainer(
         cfg=cfg,
         model=olmo_model,
@@ -347,45 +292,121 @@ def main(cfg: TrainConfig) -> None:
         device=device,
         evaluators=[],
     ) as trainer:
-        # Load checkpoint (keeping optimizer and trainer state)
-        if cfg.load_path is not None:
-            log.info(f"Loading checkpoint from {cfg.load_path}...")
-            trainer.restore_checkpoint(
-                cfg.load_path,
-                load_optimizer_state=not cfg.reset_optimizer_state,
-                load_trainer_state=not cfg.reset_trainer_state,
-                sharded_checkpointer=cfg.load_path_sharded_checkpointer,
-            )
-            log.info("Checkpoint successfully loaded")
+        log.info(f"Loading checkpoint from {checkpoint_path}...")
+        trainer.restore_checkpoint(
+            checkpoint_path,
+            load_optimizer_state=False,  # We don't need optimizer state for evaluation
+            load_trainer_state=False,  # We don't need trainer state for evaluation
+            sharded_checkpointer=cfg.load_path_sharded_checkpointer,
+        )
+        log.info("Checkpoint successfully loaded")
+        log_model_fingerprint(f"Checkpoint fingerprint ({checkpoint_path})", trainer.dist_model)
 
-        output_dir.mkdir(parents=True, exist_ok=True)
+        # Compute losses
+        losses = compute_per_example_losses(trainer, train_eval_loader, device, desc)
 
-        # Phase 1: Compute initial loss (loss0)
-        log.info("Phase 1: Computing initial loss (loss0) on training data...")
-        loss0 = compute_per_example_losses(trainer, train_eval_loader, device, "Computing loss0")
-        if get_global_rank() == 0:
-            log.info(f"Saving loss0 to {output_dir / 'loss_before.npy'}")
-            np.save(output_dir / "loss_before.npy", loss0)
+    # Clean up
+    del trainer, dist_model, olmo_model, optim, scheduler, valid_train_loader
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
-        # Phase 2: Train on validation data
-        log.info(f"Phase 2: Training on validation data for {cfg.max_duration} steps...")
-        trainer.fit()
-        log.info("Validation training complete")
+    return losses
 
-        # Phase 3: Compute updated loss (loss1)
-        log.info("Phase 3: Computing updated loss (loss1) on training data...")
-        loss1 = compute_per_example_losses(trainer, train_eval_loader, device, "Computing loss1")
-        if get_global_rank() == 0:
-            log.info(f"Saving loss1 to {output_dir / 'loss_after.npy'}")
-            np.save(output_dir / "loss_after.npy", loss1)
 
-        # Compute influence
-        if get_global_rank() == 0:
-            influence = loss0 - loss1
-            np.save(output_dir / "influence.npy", influence)
-            log.info(f"Loss0 - Mean: {np.mean(loss0):.4f}, Std: {np.std(loss0):.4f}")
-            log.info(f"Loss1 - Mean: {np.mean(loss1):.4f}, Std: {np.std(loss1):.4f}")
-            log.info(f"Influence - Mean: {np.mean(influence):.6f}, Std: {np.std(influence):.6f}")
+def main(cfg: TrainConfig) -> None:
+    """Main influence computation logic.
+
+    This follows train.py's structure but adds influence computation steps.
+    """
+    # Get influence-specific config from command line args
+    output_dir = Path(cfg.save_folder)
+    eval_batch_size = cfg.device_eval_batch_size
+
+    log.info("=" * 60)
+    log.info("Data Influence Computation")
+    log.info("=" * 60)
+    log.info(f"Initial checkpoint: {cfg.load_path}")
+    log.info(f"Updated checkpoint: {cfg.load_path}/data_influence/latest-unsharded")
+    log.info(f"Training data (for eval): {cfg.evaluators[0].data.paths}")
+    log.info(f"Output directory: {output_dir}")
+    log.info(f"Eval batch size: {eval_batch_size}")
+    log.info("=" * 60)
+
+    log_extra_field("run_name", cfg.run_name)
+
+    barrier()
+
+    # Set CUDA device (from train.py)
+    if torch.cuda.is_available():
+        torch.cuda.set_device(f"cuda:{get_local_rank()}")
+        torch.cuda.empty_cache()
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        device = torch.device("mps")
+    else:
+        device = torch.device("cpu")
+
+    # Fill configuration options (from train.py)
+    cfg.model.precision = cfg.precision
+    cfg.device_train_batch_size = cfg.global_train_batch_size // get_world_size()
+    assert cfg.device_train_batch_size is not None
+    cfg.device_train_grad_accum = cfg.device_train_batch_size // cfg.device_train_microbatch_size
+
+    barrier()
+
+    # Set seed
+    seed_all(cfg.seed)
+
+    # Build training dataloader (for evaluation) - use indexed loader
+    log.info(f"Building training dataloader (for evaluation)...")
+    train_eval_loader = build_indexed_dataloader(cfg)
+
+    barrier()
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Phase 1: Compute initial loss (loss0) with checkpoint A
+    log.info("=" * 60)
+    log.info("Phase 1: Computing initial loss (loss0) with initial checkpoint")
+    log.info("=" * 60)
+
+    loss0 = compute_losses_with_checkpoint(cfg, cfg.load_path, train_eval_loader, device, "Computing loss0")
+
+    if get_global_rank() == 0:
+        log.info(f"Saving loss0 to {output_dir / 'loss_before.npy'}")
+        np.save(output_dir / "loss_before.npy", loss0)
+        log.info(f"Loss0 - Mean: {np.mean(loss0):.4f}, Std: {np.std(loss0):.4f}")
+
+    barrier()
+
+    # Phase 2: Compute updated loss (loss1) with checkpoint B
+    log.info("=" * 60)
+    log.info("Phase 2: Computing updated loss (loss1) with updated checkpoint")
+    log.info("=" * 60)
+
+    # Create a new config with different load_path
+    cfg_after = deepcopy(cfg)
+    cfg_after.load_path = cfg.load_path + "/data_influence/latest-unsharded"
+
+    loss1 = compute_losses_with_checkpoint(cfg_after, cfg_after.load_path, train_eval_loader, device, "Computing loss1")
+
+    if get_global_rank() == 0:
+        log.info(f"Saving loss1 to {output_dir / 'loss_after.npy'}")
+        np.save(output_dir / "loss_after.npy", loss1)
+        log.info(f"Loss1 - Mean: {np.mean(loss1):.4f}, Std: {np.std(loss1):.4f}")
+
+    # Compute influence
+    if get_global_rank() == 0:
+        influence = loss0 - loss1
+        np.save(output_dir / "influence.npy", influence)
+        log.info("=" * 60)
+        log.info("Final Results")
+        log.info("=" * 60)
+        log.info(f"Loss0 - Mean: {np.mean(loss0):.4f}, Std: {np.std(loss0):.4f}")
+        log.info(f"Loss1 - Mean: {np.mean(loss1):.4f}, Std: {np.std(loss1):.4f}")
+        log.info(f"Influence - Mean: {np.mean(influence):.6f}, Std: {np.std(influence):.6f}")
+        log.info(f"Min influence: {np.min(influence):.6f}, Max influence: {np.max(influence):.6f}")
+        log.info("=" * 60)
 
     log.info("Influence computation complete!")
 
