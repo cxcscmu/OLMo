@@ -101,16 +101,25 @@ def extract_data_by_indices(
     # Validate indices
     if indices is None:
         if metrics is not None:
-            # Select indices based on metric ranking
-            print(f"Selecting top {sample_ratio:.1%} instances by metric value...")
             if len(metrics) != len(dataset):
                 raise ValueError(f"Metrics array size ({len(metrics)}) must match dataset size ({len(dataset)})")
-            num_to_select = int(len(dataset) * sample_ratio)
-            # argsort in descending order (highest metric values first)
-            sorted_indices = np.argsort(metrics)[::-1]
-            indices = sorted_indices[:num_to_select]
-            print(f"Selected {len(indices):,} instances with highest metric values")
-            print(f"  Metric range in selection: [{metrics[indices].min():.6f}, {metrics[indices].max():.6f}]")
+
+            # Apply positive filter if sample_ratio is -1
+            if sample_ratio == -1:
+                print(f"Using positive-only selection strategy (metrics > 0)...")
+                positive_mask = metrics > 0
+                indices = np.where(positive_mask)[0]
+                print(f"Selected {len(indices):,} instances with positive metrics ({len(indices)/len(dataset)*100:.2f}% of total)")
+            else:
+                # Select indices based on metric ranking
+                print(f"Selecting top {sample_ratio:.1%} instances by metric value...")
+                # Standard top-k selection
+                num_to_select = int(len(dataset) * sample_ratio)
+                # argsort in descending order (highest metric values first)
+                sorted_indices = np.argsort(metrics)[::-1]
+                indices = sorted_indices[:num_to_select]
+                print(f"Selected {len(indices):,} instances with highest metric values")
+                print(f"  Metric range in selection: [{metrics[indices].min():.6f}, {metrics[indices].max():.6f}]")
         else:
             # Random sampling
             print(f"No indices or metrics provided, generating random sample ({sample_ratio:.1%} of data)...")
