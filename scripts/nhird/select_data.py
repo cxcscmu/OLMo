@@ -72,6 +72,7 @@ def build_indexed_dataset(cfg: TrainConfig) -> IndexedDataset:
 
 
 def extract_data_by_indices(
+    args,
     cfg: TrainConfig,
     output_path: str,
     indices: np.ndarray | None,
@@ -109,6 +110,17 @@ def extract_data_by_indices(
                 print(f"Using positive-only selection strategy (metrics > 0)...")
                 positive_mask = metrics > 0
                 indices = np.where(positive_mask)[0]
+
+                if args.gumbel:
+                    metrics = (metrics - metrics.mean()) / metrics.std()
+                    metrics = metrics / args.temp
+                    # Gumbel-Top-$k$ algorithm
+                    rng = np.random.default_rng(seed=42)
+                    gumbel_noise = rng.gumbel(size=len(metrics))
+                    metrics += gumbel_noise
+                    selection_size = len(indices)
+                    indices = np.argpartition(-metrics, selection_size)[:selection_size]
+
                 print(f"Selected {len(indices):,} instances with positive metrics ({len(indices)/len(dataset)*100:.2f}% of total)")
             else:
                 # Select indices based on metric ranking
@@ -215,6 +227,8 @@ Examples:
     parser.add_argument("--indices-file", required=False, help="Path to .npy file containing indices to extract")
     parser.add_argument("--metrics-file", required=False, help="Path to .npy file containing metrics")
     parser.add_argument("--sample-ratio", type=float, default=0.2, help="Ratio of data to retain (default: 0.2)")
+    parser.add_argument("--gumbel", action="store_true", help="Apply Gumbel noise for stochastic selection")
+    parser.add_argument("--temp", type=float, default=0.5, help="Temperature for Gumbel noise (default: 0.5)")
 
     args = parser.parse_args()
 
@@ -247,6 +261,7 @@ Examples:
 
     # Extract data
     extract_data_by_indices(
+        args,
         cfg=cfg,
         output_path=args.output,
         indices=indices,
