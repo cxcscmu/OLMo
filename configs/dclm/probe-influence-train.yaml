@@ -165,15 +165,15 @@ data:
   memmap_dtype: uint32
   timeout: 0
   # paths:
-    # - /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0000/part-00-00000.npy
+    # - ${LOCAL_ROOT}/olmo/data/preprocessed/dclm/v0_rep32_ft7percentile_fw2/documents/allenai/dolma2-tokenizer/0000/part-00-00000.npy
   # SOURCE: FLAN_V2 0.2B data
   paths:
-    - /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/dclm/train_ids_olmo_0.055B.npy
-    - /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/arc_easy/input_ids.npy
-    - /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/piqa_2250/input_ids.npy
-    - /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/hellaswag_9000/input_ids.npy
+    - ${LOCAL_ROOT}/olmo/data/preprocessed/dclm/train_ids_olmo_0.055B.npy
+    - ${LOCAL_ROOT}/olmo/data/preprocessed/arc_easy/input_ids.npy
+    - ${LOCAL_ROOT}/olmo/data/preprocessed/piqa_2250/input_ids.npy
+    - ${LOCAL_ROOT}/olmo/data/preprocessed/hellaswag_9000/input_ids.npy
   label_mask_paths:
-    - /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/dclm/label_mask_olmo_0.055B.npy
-    - /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/arc_easy/label_mask.npy
-    - /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/piqa_2250/label_mask.npy
-    - /bos/tmp7/cx_group/zichunyu/healthcare/olmo/data/preprocessed/hellaswag_9000/label_mask.npy
+    - ${LOCAL_ROOT}/olmo/data/preprocessed/dclm/label_mask_olmo_0.055B.npy
+    - ${LOCAL_ROOT}/olmo/data/preprocessed/arc_easy/label_mask.npy
+    - ${LOCAL_ROOT}/olmo/data/preprocessed/piqa_2250/label_mask.npy
+    - ${LOCAL_ROOT}/olmo/data/preprocessed/hellaswag_9000/label_mask.npy
