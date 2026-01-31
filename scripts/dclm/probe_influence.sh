@@ -40,7 +40,7 @@ else
 fi
 
 # Configuration
-CONFIG_PATH="configs/dclm/probe-influence-train.yaml"
+CONFIG_PATH="configs/dclm/probe-influence-train_2x.yaml"
 export CHECKPOINT_NAME=$(basename "${CHECKPOINT_DIR}")
 export OUTPUT_DIR="${CHECKPOINT_DIR}/data_influence"
 
@@ -82,7 +82,7 @@ torchrun \
   --master_port=$((RANDOM + 20000)) \
   scripts/train.py "${CONFIG_PROCESSED}"
 
-CONFIG_PATH="configs/dclm/probe-influence-eval.yaml"
+CONFIG_PATH="configs/dclm/probe-influence-eval_2x.yaml"
 
 CONFIG_PROCESSED="${CONFIG_PATH}_$$.yaml"
 envsubst < "${CONFIG_PATH}" > "${CONFIG_PROCESSED}"
@@ -97,10 +97,11 @@ torchrun \
 
 python scripts/nhird/select_data.py \
     ${CONFIG_PROCESSED} \
-    --output ${LOCAL_ROOT}/data/preprocessed/dclm/${CHECKPOINT_NAME}_selection/train_ids_olmo.npy \
+    --output ${LOCAL_ROOT}/data/preprocessed/dclm/${CHECKPOINT_NAME}_selection/train_ids_olmo_gumbel.npy \
     --metrics-file ${OUTPUT_DIR}/influence.npy \
-    --sample-ratio -1
+    --sample-ratio -1 \
+    --gumbel
 
 echo "=================================================="
-echo "Selected data indices saved to: ${LOCAL_ROOT}/data/preprocessed/dclm/${CHECKPOINT_NAME}_selection/train_ids_olmo.npy"
+echo "Selected data indices saved to: ${LOCAL_ROOT}/data/preprocessed/dclm/${CHECKPOINT_NAME}_selection/train_ids_olmo_gumbel.npy"
 echo "=================================================="
