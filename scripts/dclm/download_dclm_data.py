@@ -58,8 +58,8 @@ def download_file(url, download_dir):
         parsed_url = urlparse(url)
         path = parsed_url.path.lstrip("/")
         if not path:
-            path = "downloaded_file"
-        file_path = os.path.join(download_dir, parsed_url.netloc, path)
+            path = "downloaded_file" 
+        file_path = os.path.join(download_dir, path)
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         if os.path.exists(file_path):
             print(f"⚠️ File already exists, skipping: {file_path}")
@@ -87,8 +87,8 @@ def download_file(url, download_dir):
 def main():
     # === CONFIGURATION ===
     yaml_file_path = "./configs/1b_nhird.yaml"
-    txt_file_path = "./scripts/nhird/dclm_path_24B.txt"
-    download_dir = "/tmp/olmo"
+    txt_file_path = "./scripts/dclm/dclm_path_51B.txt"
+    download_dir = "/bos/tmp7/cx_group/zichunyu/healthcare/olmo/data"
 
     use_yaml = False  # Set to True to use YAML
     use_txt = True  # Set to True to use TXT
