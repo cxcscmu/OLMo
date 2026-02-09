@@ -186,6 +186,48 @@ def extract_data_by_indices(
     print(f"Total extracted tokens: {len(all_tokens):,}")
     print(f"Output shape: {all_tokens.shape}")
 
+    # Handle replay data if provided
+    if args.replay_data_path:
+        print(f"\nLoading replay tokens from: {args.replay_data_path}")
+        # Use uint32 dtype (same as output)
+        replay_tokens = np.memmap(args.replay_data_path, dtype=dtype, mode='r')
+        print(f"  Total replay tokens: {len(replay_tokens):,}")
+
+        # Calculate 1/5 of current selection's token count
+        seq_len = cfg.model.max_sequence_length
+        current_num_instances = len(all_tokens) // seq_len
+        replay_num_instances = current_num_instances // 5
+        replay_sample_size = replay_num_instances * seq_len
+
+        print(f"  Current selection: {current_num_instances:,} instances ({len(all_tokens):,} tokens)")
+        print(f"  Sampling {replay_num_instances:,} replay instances ({replay_sample_size:,} tokens, 1/5 of current)")
+
+        # Randomly sample complete instances from replay data
+        max_instances = len(replay_tokens) // seq_len
+        if max_instances < replay_num_instances:
+            print(f"  WARNING: Replay data has only {max_instances:,} instances. Using all of them.")
+            replay_num_instances = max_instances
+            replay_sample_size = replay_num_instances * seq_len
+
+        rng = np.random.default_rng(seed=42)
+        sampled_instance_indices = rng.choice(max_instances, size=replay_num_instances, replace=False)
+        sampled_instance_indices = np.sort(sampled_instance_indices)  # Sort for better memory access
+
+        # Extract full sequences
+        print(f"  Extracting {replay_num_instances:,} sampled replay instances...")
+        replay_sampled_list = []
+        for inst_idx in sampled_instance_indices:
+            start = inst_idx * seq_len
+            end = start + seq_len
+            replay_sampled_list.append(replay_tokens[start:end].copy())  # Copy to load into memory
+
+        replay_sampled = np.concatenate(replay_sampled_list)
+        print(f"  Extracted {len(replay_sampled):,} replay tokens")
+
+        # Merge with current tokens
+        all_tokens = np.concatenate([all_tokens, replay_sampled]).astype(dtype)
+        print(f"  After merging: {len(all_tokens):,} total tokens ({len(all_tokens)//seq_len:,} instances)")
+
     # Save as raw binary file (same format as input)
     print(f"\nSaving to: {output_path}")
     output_path = Path(output_path)
@@ -229,6 +271,7 @@ Examples:
     parser.add_argument("--sample-ratio", type=float, default=0.2, help="Ratio of data to retain (default: 0.2)")
     parser.add_argument("--gumbel", action="store_true", help="Apply Gumbel noise for stochastic selection")
     parser.add_argument("--temp", type=float, default=0.5, help="Temperature for Gumbel noise (default: 0.5)")
+    parser.add_argument("--replay-data-path", help="Path to previous phase's train_ids_olmo_gumbel.npy file for replay sampling")
 
     args = parser.parse_args()
 
