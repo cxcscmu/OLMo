@@ -77,10 +77,12 @@ echo "Number of GPUs: ${NUM_GPUS}"
 echo "=================================================="
 
 # Run training to get updated model
-torchrun \
-  --nproc_per_node="$NUM_GPUS" \
-  --master_port=$((RANDOM + 20000)) \
-  scripts/train.py "${CONFIG_PROCESSED}"
+if [ ! -f "${OUTPUT_DIR}/influence.npy" ]; then
+    torchrun \
+      --nproc_per_node="$NUM_GPUS" \
+      --master_port=$((RANDOM + 20000)) \
+      scripts/train.py "${CONFIG_PROCESSED}"
+fi
 
 CONFIG_PATH="configs/dclm/probe-influence-eval_2x.yaml"
 
@@ -89,11 +91,13 @@ envsubst < "${CONFIG_PATH}" > "${CONFIG_PROCESSED}"
 CLEANUP_FILES+=("${CONFIG_PROCESSED}")
 
 # Run influence computation
-torchrun \
-  --nproc_per_node="${NUM_GPUS}" \
-  --master_port=$((RANDOM + 20001)) \
-  scripts/dclm/probe_influence.py \
-  "${CONFIG_PROCESSED}"
+if [ ! -f "${OUTPUT_DIR}/influence.npy" ]; then
+    torchrun \
+      --nproc_per_node="$NUM_GPUS" \
+      --master_port=$((RANDOM + 20001)) \
+      scripts/dclm/probe_influence.py \
+      "${CONFIG_PROCESSED}"
+fi
 
 python scripts/nhird/select_data.py \
     ${CONFIG_PROCESSED} \
@@ -101,6 +105,7 @@ python scripts/nhird/select_data.py \
     --metrics-file ${OUTPUT_DIR}/influence.npy \
     --sample-ratio -1 \
     --gumbel
+    # ${DATA_PATH:+--replay-data-path "$DATA_PATH"}
 
 echo "=================================================="
 echo "Selected data indices saved to: ${LOCAL_ROOT}/data/preprocessed/dclm/${CHECKPOINT_NAME}_selection/train_ids_olmo_gumbel.npy"
