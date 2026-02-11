@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=nhird_midtrain
-#SBATCH --output=logs/nhird_midtrain_%j.out
-#SBATCH --error=logs/nhird_midtrain_%j.err
+#SBATCH --output=runs/nhird_midtrain_%j.out
+#SBATCH --error=runs/nhird_midtrain_%j.err
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 #SBATCH --cpus-per-task=208

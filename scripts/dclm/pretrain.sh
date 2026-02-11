@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=dclm_pretrain
-#SBATCH --output=logs/dclm_pretrain_%j.out
-#SBATCH --error=logs/dclm_pretrain_%j.err
+#SBATCH --output=runs/dclm_pretrain_%j.out
+#SBATCH --error=runs/dclm_pretrain_%j.err
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 #SBATCH --cpus-per-task=208

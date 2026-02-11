@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=probe_influence
-#SBATCH --output=logs/probe_influence_%j.out
-#SBATCH --error=logs/probe_influence_%j.err
+#SBATCH --output=runs/probe_influence_%j.out
+#SBATCH --error=runs/probe_influence_%j.err
 #SBATCH --nodes=1
 #SBATCH --gres=gpu:8
 #SBATCH --cpus-per-task=128

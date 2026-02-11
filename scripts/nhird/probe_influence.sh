@@ -1,13 +1,13 @@
 #!/bin/bash
-# Probe data influence via validation-updated model (YAML-based, FSDP-compatible)
-# This script uses the full train.py infrastructure with a custom config
 set -euo pipefail
 
 source .env
 
 # Configuration
 CONFIG_PATH="configs/nhird/probe-influence.yaml"
-OUTPUT_DIR="${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/step2000-unsharded/data_influence"
+export CHECKPOINT_DIR="${LOCAL_ROOT}/out/OLMo-2-0425-1B_stage1/step1907359-vocab_expansion-midtrain/phase12_selective/step9624-unsharded"
+export CHECKPOINT_NAME=$(basename "${CHECKPOINT_DIR}")
+export OUTPUT_DIR="${CHECKPOINT_DIR}/data_influence"
 
 # Count visible GPUs
 NUM_GPUS=$(nvidia-smi -L | wc -l)
@@ -37,6 +37,7 @@ echo "=================================================="
 # Run with torchrun
 torchrun \
   --nproc_per_node="${NUM_GPUS}" \
+  --master_port=12345 \
   scripts/nhird/probe_influence_v2.py \
   "${CONFIG_PROCESSED}"
 
