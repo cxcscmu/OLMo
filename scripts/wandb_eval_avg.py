@@ -87,31 +87,29 @@ def display_results(metrics_by_step: dict, title: str = "Eval/Downstream Average
 
 def merge_metrics(all_metrics: list) -> dict:
     """
-    Merge metrics from multiple runs by averaging at each step.
+    Get metrics from runs (uses first run, no averaging across runs).
 
     Args:
         all_metrics: List of metrics_by_step dictionaries
 
     Returns:
-        Merged dictionary with averaged values at each step
+        Dictionary with step -> average score (average of tasks at each step)
     """
-    merged = defaultdict(list)
+    if not all_metrics:
+        return {}
 
+    result = {}
     for metrics_by_step in all_metrics:
         for step, values in metrics_by_step.items():
             if values:
                 avg = sum(values.values()) / len(values)
-                merged[step].append(avg)
-
-    result = {}
-    for step, avg_list in merged.items():
-        result[step] = sum(avg_list) / len(avg_list)
+                result[step] = avg
 
     return result
 
 
-def display_merged_results(merged: dict):
-    """Display merged results."""
+def display_merged_results(merged: dict, all_metrics: list = None):
+    """Display merged results with best step and per-task breakdown."""
     if not merged:
         print("No merged metrics found.")
         return
@@ -121,11 +119,35 @@ def display_merged_results(merged: dict):
     table.align["Step"] = "r"
     table.align["Average"] = "r"
 
+    best_step = None
+    best_avg = -float("inf")
+
     for step in sorted(merged.keys()):
         table.add_row([step, f"{merged[step]:.4f}"])
+        if merged[step] > best_avg:
+            best_avg = merged[step]
+            best_step = step
 
     print("\n=== Merged Downstream Average by Step ===")
     print(table)
+
+    # Display best step with per-task breakdown
+    if best_step is not None and all_metrics:
+        print(f"\n=== Best Step: {best_step} (Average: {best_avg:.4f}) ===")
+
+        # Use the first run that has data for this step to get all tasks
+        for metrics_by_step in all_metrics:
+            if best_step in metrics_by_step:
+                # Get all task scores at the best step from all runs
+                task_table = PrettyTable()
+                task_table.field_names = ["Task", "Score"]
+                task_table.align["Task"] = "l"
+                task_table.align["Score"] = "r"
+                for task in sorted(metrics_by_step[best_step].keys()):
+                    score = metrics_by_step[best_step][task]
+                    task_table.add_row([task, f"{score:.4f}"])
+
+        print(task_table)
 
 
 def main():
@@ -140,6 +162,7 @@ def main():
     parser.add_argument("--entity", default="cxcscmu", help="W&B entity name")
     parser.add_argument("--project", default="healthcare", help="W&B project name")
     parser.add_argument("--group", help="W&B group name to fetch all runs from")
+    parser.add_argument("--name", help="Run name to filter when fetching from group (optional)")
     args = parser.parse_args()
 
     if args.group:
@@ -155,7 +178,7 @@ def main():
 
         all_metrics = []
         for run in tqdm(runs, desc="Processing runs"):
-            if run.name != "dclm_1.4B_selective_repetition":
+            if args.name and run.name != args.name:
                 continue
             print(f"\nProcessing run: {run.name} ({run.id})")
             run_path = f"{args.entity}/{args.project}/{run.id}"
@@ -164,7 +187,7 @@ def main():
             display_results(metrics, title=f"Run: {run.name}")
 
         merged = merge_metrics(all_metrics)
-        display_merged_results(merged)
+        display_merged_results(merged, all_metrics)
 
     elif args.run_path:
         print(f"Fetching metrics from: {args.run_path}")
@@ -172,6 +195,9 @@ def main():
 
         metrics_by_step = get_eval_downstream_metrics(args.run_path, args.eval_interval)
         display_results(metrics_by_step)
+
+        merged = merge_metrics([metrics_by_step])
+        display_merged_results(merged, [metrics_by_step])
 
     else:
         parser.error("Either --run-path or --group (with --entity and --project) is required")
