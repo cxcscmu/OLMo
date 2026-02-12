@@ -1,9 +1,9 @@
-run_name: dclm_2.3B_selective_repetition_gumbel
+run_name: dclm_2.3B_organic+recycled_repetition_gumbel
 seed: 87
 dry_run: false
 
 wandb:
-  name: dclm_2.3B_selective_repetition_gumbel
+  name: dclm_2.3B_organic+recycled_repetition_gumbel
   entity: cxcscmu
   project: healthcare
   group: OLMo-300M_dynamic_selective_repetition
@@ -91,7 +91,7 @@ no_pre_train_checkpoint: true
 
 max_duration: 1ep
 global_train_batch_size: 512
-device_train_microbatch_size: 8
+device_train_microbatch_size: 32
 
 precision: amp_bf16
 
