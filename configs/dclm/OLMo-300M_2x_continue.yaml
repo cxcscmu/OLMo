@@ -91,7 +91,7 @@ no_pre_train_checkpoint: true
 
 max_duration: 10ep
 global_train_batch_size: 512
-device_train_microbatch_size: 8
+device_train_microbatch_size: 32
 
 precision: amp_bf16
 
