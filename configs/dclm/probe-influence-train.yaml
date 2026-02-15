@@ -1,9 +1,9 @@
-run_name: probe_influence
+run_name: probe_influence_${CHECKPOINT_NAME}
 seed: 42
 dry_run: false
 
 wandb:
-  name: probe_influence
+  name: probe_influence_${CHECKPOINT_NAME}
   entity: cxcscmu
   project: healthcare
   group: OLMo-300M_probe_influence
@@ -110,7 +110,7 @@ speed_monitor:
 gen1_gc_interval: 10
 
 eval_on_load: true
-eval_interval: 40
+eval_interval: 80
 eval_subset_num_batches: -1
 device_eval_batch_size: 16
 evaluators:

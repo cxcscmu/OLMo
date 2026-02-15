@@ -1,9 +1,9 @@
-run_name: probe_influence
+run_name: probe_influence_${CHECKPOINT_NAME}
 seed: 42
 dry_run: false
 
 wandb:
-  name: probe_influence
+  name: probe_influence_${CHECKPOINT_NAME}
   entity: cxcscmu
   project: healthcare
   group: OLMo-300M_dclm_2.3B_probe_influence
