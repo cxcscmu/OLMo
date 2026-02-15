@@ -1,15 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=nhird_5phases
-#SBATCH --output=logs/nhird_5phases_%j.out
-#SBATCH --error=logs/nhird_5phases_%j.err
+#SBATCH --job-name=nhird_selective
+#SBATCH --partition=cx-hyper-p
+#SBATCH --output=runs/nhird_selective_%j.out
+#SBATCH --error=runs/nhird_selective_%j.err
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=208
-#SBATCH --mem=1792G
-#SBATCH --time=1-00:00:00
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=128
+#SBATCH --mem=1536G
+#SBATCH --time=2-00:00:00
 
-# 5-Phase Training Script
-# This script sequentially runs 5 training phases with different data mixtures.
+# Multi-Phase Training Script
+# This script sequentially runs multiple training phases with different data mixtures.
 # Each phase loads the checkpoint from the previous phase.
 
 # print commands
@@ -41,10 +42,10 @@ fi
 # Function to run a single phase
 run_phase() {
   local phase_num=$1
-  local config_path="configs/nhird/5phases/phase${phase_num}.yaml"
+  local config_path="configs/nhird/8phases_selective/phase${phase_num}.yaml"
 
   echo "=================================================="
-  echo "Starting Phase ${phase_num}/5"
+  echo "Starting Phase ${phase_num}"
   echo "Config: ${config_path}"
   echo "=================================================="
 
@@ -58,6 +59,7 @@ run_phase() {
   # Run training
   torchrun \
     --nproc_per_node="$NUM_GPUS" \
+    --master_port=$((12345 + phase_num)) \
     scripts/train.py "${CONFIG_PROCESSED}"
 
   local exit_code=$?
@@ -69,16 +71,12 @@ run_phase() {
   fi
 
   echo "=================================================="
-  echo "Phase ${phase_num}/5 completed successfully"
+  echo "Phase ${phase_num} completed successfully"
   echo "=================================================="
   echo ""
 }
 
-# Run all 5 phases sequentially
-for phase in {1..5}; do
+# Run all phases sequentially
+for phase in 12; do
   run_phase $phase
 done
-
-echo "=================================================="
-echo "All 5 phases completed successfully!"
-echo "=================================================="
