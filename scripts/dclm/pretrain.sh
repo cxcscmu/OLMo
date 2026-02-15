@@ -1,11 +1,12 @@
 #!/bin/bash
 #SBATCH --job-name=dclm_pretrain
+#SBATCH --partition=cx-hyper-p
 #SBATCH --output=runs/dclm_pretrain_%j.out
 #SBATCH --error=runs/dclm_pretrain_%j.err
 #SBATCH --nodes=1
-#SBATCH --gres=gpu:8
-#SBATCH --cpus-per-task=208
-#SBATCH --mem=1792G
+#SBATCH --gres=gpu:4
+#SBATCH --cpus-per-task=128
+#SBATCH --mem=512G
 #SBATCH --time=2-00:00:00
 
 # print commands
