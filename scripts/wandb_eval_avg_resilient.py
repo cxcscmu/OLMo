@@ -20,6 +20,19 @@ from tqdm import tqdm
 
 
 DOWNSTREAM_PREFIX = "eval/downstream/"
+BOLD = "\033[1m"
+RESET = "\033[0m"
+
+
+def format_task_name(task: str) -> str:
+    for suffix in ("_len_norm", "_acc"):
+        if task.endswith(suffix):
+            return task[: -len(suffix)]
+    return task
+
+
+def bold(text: str) -> str:
+    return f"{BOLD}{text}{RESET}"
 
 
 def normalize_run_path(run_path: str) -> str:
@@ -121,18 +134,55 @@ def display_results(metrics_by_step: dict[int, dict[str, float]], title: str):
         print("No eval/downstream metrics found.")
         return
 
-    table = PrettyTable()
-    table.field_names = ["Step", "Average", "TaskCount"]
-    table.align["Step"] = "r"
-    table.align["Average"] = "r"
-    table.align["TaskCount"] = "r"
+    all_tasks = sorted({task for tasks in metrics_by_step.values() for task in tasks})
+    best_avg = -float("inf")
+    best_avg_steps: set[int] = set()
+    best_task_values: dict[str, float] = {}
 
     for step in sorted(metrics_by_step):
-        scores = list(metrics_by_step[step].values())
+        step_tasks = metrics_by_step[step]
+        if not step_tasks:
+            continue
+        avg = sum(step_tasks.values()) / len(step_tasks)
+        if avg > best_avg:
+            best_avg = avg
+            best_avg_steps = {step}
+        elif avg == best_avg:
+            best_avg_steps.add(step)
+
+    for task in all_tasks:
+        values = [tasks[task] for tasks in metrics_by_step.values() if task in tasks]
+        if values:
+            best_task_values[task] = max(values)
+
+    display_names = {task: format_task_name(task) for task in all_tasks}
+    table = PrettyTable()
+    table.field_names = ["Step", "Average", *[display_names[task] for task in all_tasks]]
+    table.align["Step"] = "r"
+    table.align["Average"] = "r"
+    for task in all_tasks:
+        table.align[display_names[task]] = "r"
+
+    for step in sorted(metrics_by_step):
+        step_tasks = metrics_by_step[step]
+        scores = list(step_tasks.values())
         if not scores:
             continue
         avg = sum(scores) / len(scores)
-        table.add_row([step, f"{avg:.4f}", len(scores)])
+        avg_str = f"{avg:.4f}"
+        if step in best_avg_steps:
+            avg_str = bold(avg_str)
+        row = [step, avg_str]
+        for task in all_tasks:
+            value = step_tasks.get(task)
+            if value is None:
+                row.append("-")
+                continue
+            value_str = f"{value:.4f}"
+            if task in best_task_values and value == best_task_values[task]:
+                value_str = bold(value_str)
+            row.append(value_str)
+        table.add_row(row)
 
     print(f"\n=== {title} ===")
     print(table)
@@ -158,7 +208,7 @@ def display_best_step(metrics_by_step: dict[int, dict[str, float]]):
     table.align["Task"] = "l"
     table.align["Score"] = "r"
     for task in sorted(metrics_by_step[best_step]):
-        table.add_row([task, f"{metrics_by_step[best_step][task]:.4f}"])
+        table.add_row([format_task_name(task), f"{metrics_by_step[best_step][task]:.4f}"])
     print(table)
 
 
@@ -193,7 +243,7 @@ def main():
         max_step=args.max_step,
         excluded=set(args.exclude_key),
     )
-    display_results(metrics_by_step, title="Eval/Downstream Average by Step")
+    display_results(metrics_by_step, title="Eval/Downstream Results by Step")
     display_best_step(metrics_by_step)
 
     if not metrics_by_step:
