@@ -71,6 +71,72 @@ def build_indexed_dataset(cfg: TrainConfig) -> IndexedDataset:
     return dataset
 
 
+def count_positive_by_path(cfg: TrainConfig, metrics: np.ndarray):
+    """Report how many positive-metric instances come from each source file path.
+
+    Positive is defined as ``metrics > 0`` (same as the positive-only selection branch).
+    """
+    data_cfg = DataConfig(
+        paths=cfg.evaluators[0].data.paths,
+        memmap_dtype=cfg.data.memmap_dtype,
+        pad_direction=cfg.data.pad_direction,
+        num_workers=cfg.data.num_workers,
+        drop_last=False,
+        pin_memory=cfg.data.pin_memory,
+        prefetch_factor=cfg.data.prefetch_factor if cfg.data.num_workers > 0 else None,
+        persistent_workers=cfg.data.persistent_workers if cfg.data.num_workers > 0 else False,
+        timeout=cfg.data.timeout,
+    )
+    dataset = build_memmap_dataset(cfg, data_cfg, include_instance_metadata=False)
+
+    if len(metrics) != len(dataset):
+        raise ValueError(f"Metrics array size ({len(metrics)}) must match dataset size ({len(dataset)})")
+
+    positive_mask = metrics > 0
+    total_positive = int(positive_mask.sum())
+    total_instances = len(dataset)
+    total_positive_pct = (total_positive / total_instances * 100) if total_instances > 0 else 0.0
+
+    rows = []
+    for (start, end), path in zip(dataset.offsets, dataset._memmap_paths):
+        file_metrics = metrics[start:end]
+        n_instances = end - start
+        n_positive = int(positive_mask[start:end].sum())
+        pct_in_file = (n_positive / n_instances * 100) if n_instances > 0 else 0.0
+        pct_of_all_pos = (n_positive / total_positive * 100) if total_positive > 0 else 0.0
+        avg_influence = float(file_metrics.mean()) if n_instances > 0 else float("nan")
+        rows.append(
+            (
+                n_positive,
+                n_instances,
+                pct_in_file,
+                pct_of_all_pos,
+                avg_influence,
+                str(path),
+            )
+        )
+
+    rows.sort(key=lambda x: (-x[0], x[5]))
+
+    print("\nPositive count by source path (metrics > 0)")
+    print("=" * 160)
+    print(f"Total instances: {total_instances:,}")
+    print(f"Total positives: {total_positive:,} ({total_positive_pct:.2f}%)")
+    print("-" * 160)
+    print(
+        f"{'positives':>12}  {'instances':>12}  {'pos%_file':>10}  {'share_pos%':>10}  " f"{'avg_infl':>12}  path"
+    )
+    print("-" * 160)
+    for n_positive, n_instances, pct_in_file, pct_of_all_pos, avg_influence, path_str in rows:
+        print(
+            f"{n_positive:12,}  {n_instances:12,}  {pct_in_file:10.2f}  {pct_of_all_pos:10.2f}  "
+            f"{avg_influence:12.6e}  {path_str}"
+        )
+    print("-" * 160)
+    print(f"Files listed: {len(rows)}")
+    print("=" * 160)
+
+
 def extract_data_by_indices(
     args,
     cfg: TrainConfig,
@@ -121,7 +187,9 @@ def extract_data_by_indices(
                     selection_size = len(indices)
                     indices = np.argpartition(-metrics, selection_size)[:selection_size]
 
-                print(f"Selected {len(indices):,} instances with positive metrics ({len(indices)/len(dataset)*100:.2f}% of total)")
+                print(
+                    f"Selected {len(indices):,} instances with positive metrics ({len(indices)/len(dataset)*100:.2f}% of total)"
+                )
             else:
                 # Select indices based on metric ranking
                 print(f"Selecting top {sample_ratio:.1%} instances by metric value...")
@@ -190,7 +258,7 @@ def extract_data_by_indices(
     if args.replay_data_path:
         print(f"\nLoading replay tokens from: {args.replay_data_path}")
         # Use uint32 dtype (same as output)
-        replay_tokens = np.memmap(args.replay_data_path, dtype=dtype, mode='r')
+        replay_tokens = np.memmap(args.replay_data_path, dtype=dtype, mode="r")
         print(f"  Total replay tokens: {len(replay_tokens):,}")
 
         # Calculate 1/5 of current selection's token count
@@ -200,7 +268,9 @@ def extract_data_by_indices(
         replay_sample_size = replay_num_instances * seq_len
 
         print(f"  Current selection: {current_num_instances:,} instances ({len(all_tokens):,} tokens)")
-        print(f"  Sampling {replay_num_instances:,} replay instances ({replay_sample_size:,} tokens, 1/5 of current)")
+        print(
+            f"  Sampling {replay_num_instances:,} replay instances ({replay_sample_size:,} tokens, 1/5 of current)"
+        )
 
         # Randomly sample complete instances from replay data
         max_instances = len(replay_tokens) // seq_len
@@ -265,13 +335,14 @@ Examples:
     )
 
     parser.add_argument("config_path", help="Path to config file (e.g., configs/nhird/probe-influence.yaml)")
-    parser.add_argument("--output", required=True, help="Path to save extracted data")
+    parser.add_argument("--output", required=False, help="Path to save extracted data")
     parser.add_argument("--indices-file", required=False, help="Path to .npy file containing indices to extract")
     parser.add_argument("--metrics-file", required=False, help="Path to .npy file containing metrics")
     parser.add_argument("--sample-ratio", type=float, default=0.2, help="Ratio of data to retain (default: 0.2)")
     parser.add_argument("--gumbel", action="store_true", help="Apply Gumbel noise for stochastic selection")
     parser.add_argument("--temp", type=float, default=0.5, help="Temperature for Gumbel noise (default: 0.5)")
     parser.add_argument("--replay-data-path", help="Path to previous phase's train_ids_olmo_gumbel.npy file for replay sampling")
+    parser.add_argument("--count-positive-by-path", action="store_true", help="Only report positive counts per source file path")
 
     args = parser.parse_args()
 
@@ -301,6 +372,15 @@ Examples:
         print(f"Loading metrics from: {args.metrics_file}")
         metrics = np.load(args.metrics_file)
         print(f"Loaded {len(metrics):,} metric values")
+
+    if args.count_positive_by_path:
+        if metrics is None:
+            raise ValueError("--count-positive-by-path requires --metrics-file")
+        count_positive_by_path(cfg=cfg, metrics=metrics)
+        return
+
+    if args.output is None:
+        raise ValueError("--output is required unless --count-positive-by-path is used")
 
     # Extract data
     extract_data_by_indices(
