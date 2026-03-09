@@ -26,6 +26,7 @@ def main(opts) -> None:
 
     dataset = ds.load_dataset("allenai/tulu-v2-sft-mixture", split="train")
     dataset = dataset.filter(lambda x: x["dataset"] == "flan_v2")
+    # dataset = dataset.select(np.random.RandomState(42).choice(len(dataset), size=512, replace=False))
     print("FLAN V2 dataset size:", len(dataset))
 
     log.info("Tokenizing dataset...")
