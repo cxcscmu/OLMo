@@ -171,5 +171,5 @@ data:
   paths:
     #SOURCE: NHIRD (0.228BT)
     - ${LOCAL_ROOT}/data/preprocessed/nhird/phase2_dry_selection/train_ids_olmo_0.228B.npy
-    #SOURCE: dclm_path_24B.txt lines 49-64
+    #SOURCE: dclm_path_24B.txt lines 49-64, does not work well?
     - ${LOCAL_ROOT}/data/preprocessed/dclm/train_ids_olmo_0.228B.npy
